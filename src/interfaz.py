@@ -240,6 +240,10 @@ class AplicacionReciclaje(ctk.CTk):
             self.mostrar_puntos()
             return
 
+        if nombre == "Rutas":
+            self.mostrar_rutas()
+            return
+
         # Eliminar el contenido actual de la pantalla
         for elemento in self.contenido.winfo_children():
             elemento.destroy()
@@ -543,7 +547,148 @@ class AplicacionReciclaje(ctk.CTk):
             "Registro exitoso",
             f"Se registró el punto {codigo} - {nombre}."
         )
+    def mostrar_rutas(self):
+        for elemento in self.contenido.winfo_children():
+            elemento.destroy()
 
+        ctk.CTkLabel(
+            self.contenido,
+            text="Rutas",
+            font=("Arial", 32, "bold"),
+            text_color="#10201B"
+        ).pack(anchor="w", pady=(0, 10))
+
+        ctk.CTkLabel(
+            self.contenido,
+            text="Crea y consulta recorridos ordenados de recolección.",
+            font=("Arial", 16),
+            text_color="#64748B"
+        ).pack(anchor="w")
+
+        ctk.CTkButton(
+            self.contenido,
+            text="+ Crear ruta",
+            font=("Arial", 15, "bold"),
+            fg_color="#007A43",
+            hover_color="#005C32",
+            height=45,
+            corner_radius=10,
+            command=self.mostrar_formulario_ruta
+        ).pack(anchor="e", pady=(20, 10))
+
+        tabla = ctk.CTkFrame(
+            self.contenido,
+            fg_color="white",
+            corner_radius=10
+        )
+        tabla.pack(fill="x", pady=(15, 10))
+
+        encabezados = ["Nombre", "Recorrido (orden)", "Puntos", "Carga total (kg)"]
+        for columna, texto in enumerate(encabezados):
+            ctk.CTkLabel(
+                tabla,
+                text=texto,
+                font=("Arial", 13, "bold"),
+                text_color="#10201B"
+            ).grid(row=0, column=columna, padx=12, pady=15, sticky="w")
+            tabla.grid_columnconfigure(columna, weight=1)
+
+        for fila, ruta in enumerate(self.rutas, start=1):
+            recorrido = " -> ".join(f"{p.codigo} ({p.nombre})" for p in ruta.puntos)
+            datos = [
+                ruta.nombre,
+                recorrido,
+                str(len(ruta.puntos)),
+                f"{ruta.cantidad_total_kg():g} kg"
+            ]
+            for columna, valor in enumerate(datos):
+                ctk.CTkLabel(
+                    tabla,
+                    text=valor,
+                    font=("Arial", 12),
+                    text_color="#475569",
+                    wraplength=220
+                ).grid(row=fila, column=columna, padx=12, pady=10, sticky="w")
+
+    def mostrar_formulario_ruta(self):
+        from tkinter import messagebox
+
+        if not self.planificador.puntos:
+            messagebox.showwarning(
+                "Sin puntos",
+                "Primero registra al menos un punto de recolección."
+            )
+            return
+
+        self.ventana_ruta = ctk.CTkToplevel(self)
+        self.ventana_ruta.title("Crear nueva ruta")
+        self.ventana_ruta.geometry("460x460")
+        self.ventana_ruta.resizable(False, False)
+        self.ventana_ruta.grab_set()
+
+        ctk.CTkLabel(
+            self.ventana_ruta,
+            text="Crear nueva ruta",
+            font=("Arial", 22, "bold")
+        ).pack(pady=(25, 15))
+
+        self.nombre_ruta = ctk.CTkEntry(
+            self.ventana_ruta,
+            placeholder_text="Nombre de la ruta (ejemplo: Ruta Sur)",
+            width=350
+        )
+        self.nombre_ruta.pack(pady=10)
+
+        self.codigos_ruta = ctk.CTkEntry(
+            self.ventana_ruta,
+            placeholder_text="Códigos en orden separados por coma (ej: P001, P002)",
+            width=350
+        )
+        self.codigos_ruta.pack(pady=10)
+
+        disponibles = ", ".join(
+            f"{p.codigo} ({p.nombre})"
+            for p in self.planificador.puntos.values()
+        )
+        ctk.CTkLabel(
+            self.ventana_ruta,
+            text=f"Puntos disponibles: {disponibles}",
+            font=("Arial", 12),
+            text_color="#64748B",
+            wraplength=350
+        ).pack(pady=(5, 15))
+
+        ctk.CTkButton(
+            self.ventana_ruta,
+            text="Guardar ruta",
+            fg_color="#007A43",
+            hover_color="#005C32",
+            width=350,
+            height=45,
+            command=self.guardar_ruta
+        ).pack(pady=15)
+
+    def guardar_ruta(self):
+        from tkinter import messagebox
+
+        nombre = self.nombre_ruta.get().strip()
+        codigos = [
+            c.strip()
+            for c in self.codigos_ruta.get().split(",")
+            if c.strip()
+        ]
+
+        try:
+            ruta = self.planificador.crear_ruta(nombre, codigos)
+        except ValueError as error:
+            messagebox.showerror("Error", str(error))
+            return
+
+        self.rutas.append(ruta)
+        self.ventana_ruta.destroy()
+        self.mostrar_rutas()
+
+        messagebox.showinfo("Ruta creada", ruta.describir())
 if __name__ == "__main__":
     app = AplicacionReciclaje()
     app.mainloop()
